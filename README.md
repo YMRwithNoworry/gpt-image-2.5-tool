@@ -79,7 +79,7 @@ Base URL 填中转站地址（**不要带 `/v1`**），例如 `https://api.examp
 | `image` / `image[]` | 参考图。multipart 表单上传本地文件，或改用 JSON 模式传 `image_urls` |
 | `image_urls` | 参考图 URL 数组，最多 16 张（JSON 模式） |
 | `mask` / `mask_url` | 蒙版。**PNG 且带 alpha 通道**，尺寸需与第一张参考图完全一致；**全透明像素 = 要重绘的区域** |
-| `input_fidelity` | 部分网关支持，用于控制对参考图的还原程度 |
+| `input_fidelity` | `low` / `high`，控制对参考图的还原程度；留空则不发送该字段（部分网关不支持） |
 
 编辑模式提供两种请求格式：
 

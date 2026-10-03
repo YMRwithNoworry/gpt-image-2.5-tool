@@ -354,12 +354,22 @@ pre{margin:0;padding:12px 14px;border-top:1px solid var(--line);background:#0a0e
             <input type="file" id="maskFile" accept="image/png,image/*">
             <div class="files" id="maskList"></div>
           </div>
-          <div class="field">
-            <label>编辑请求格式</label>
-            <select id="editFormat">
-              <option value="multipart" selected>multipart/form-data（OpenAI 官方 /v1/images/edits）</option>
-              <option value="json">JSON + image_urls（部分网关）</option>
-            </select>
+          <div class="row c2">
+            <div class="field">
+              <label>编辑请求格式</label>
+              <select id="editFormat">
+                <option value="multipart" selected>multipart/form-data（官方）</option>
+                <option value="json">JSON + image_urls（网关）</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>输入保真度 input_fidelity</label>
+              <select id="pFidelity">
+                <option value="" selected>不发送（默认）</option>
+                <option value="low">low</option>
+                <option value="high">high（更贴近原图）</option>
+              </select>
+            </div>
           </div>
         </div>
       </div>
@@ -598,6 +608,10 @@ function buildBody(){
   if (partials > 0){ body.stream = true; body.partial_images = partials; }
   var user = $("#pUser").value.trim();
   if (user) body.user = user;
+  if (state.mode === "edit"){
+    var fid = $("#pFidelity").value;
+    if (fid) body.input_fidelity = fid;
+  }
   return body;
 }
 function buildHeaders(){
@@ -991,7 +1005,7 @@ document.querySelectorAll(".tab").forEach(function(t){
 });
 
 $("#sizeMode").addEventListener("change", function(){ updateVisibility(); refreshCost(); refreshPreview(); });
-["pN","pQuality","pSize","pW","pH","pRatio","pResolution","pFormat","pBackground","pModeration","pPartials","pUser","pCompression","taskPath","baseUrl","orgId","projectId","timeoutSec","retryCount","editFormat","asyncPoll"]
+["pN","pQuality","pSize","pW","pH","pRatio","pResolution","pFormat","pBackground","pModeration","pPartials","pUser","pCompression","taskPath","baseUrl","orgId","projectId","timeoutSec","retryCount","editFormat","pFidelity","asyncPoll"]
   .forEach(function(id){
     var el = document.getElementById(id);
     if (!el) return;
@@ -1064,7 +1078,7 @@ document.addEventListener("keydown", function(e){ if (e.key === "Escape") $("#vi
 function saveSettings(){
   if (!$("#rememberCfg").checked) return;
   var s = {};
-  ["baseUrl","apiKey","orgId","projectId","timeoutSec","retryCount","customModel","pQuality","sizeMode","pSize","pW","pH","pRatio","pResolution","pFormat","pBackground","pModeration","pPartials","pUser","taskPath","editFormat"].forEach(function(id){
+  ["baseUrl","apiKey","orgId","projectId","timeoutSec","retryCount","customModel","pQuality","sizeMode","pSize","pW","pH","pRatio","pResolution","pFormat","pBackground","pModeration","pPartials","pUser","taskPath","editFormat","pFidelity"].forEach(function(id){
     var el = document.getElementById(id); if (el) s[id] = el.value;
   });
   s.lockSnapshot = $("#lockSnapshot").checked;
