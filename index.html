@@ -78,6 +78,33 @@ input[type=file]{font-size:12px;color:var(--muted);width:100%}
 .tabs{display:flex;gap:6px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:4px}
 .tab{flex:1;text-align:center;padding:7px;border-radius:7px;cursor:pointer;font-size:13px;color:var(--muted);transition:.15s}
 .tab.on{background:var(--accent);color:#fff;font-weight:600}
+/* 提示词 + 样图 一体化输入框 */
+.composer{border:1px solid var(--line);background:var(--panel2);border-radius:11px;padding:8px 8px 6px;transition:.15s}
+.composer:focus-within{border-color:var(--accent);box-shadow:0 0 0 3px rgba(79,140,255,.14)}
+.composer.drag{border-color:var(--accent2);background:rgba(34,197,94,.07);box-shadow:0 0 0 3px rgba(34,197,94,.15)}
+.composer textarea{border:none;background:transparent;padding:4px;min-height:104px;box-shadow:none}
+.composer textarea:focus{border:none;box-shadow:none}
+.thumbs{display:flex;flex-wrap:wrap;gap:8px;padding:2px 2px 8px}
+.thumbs:empty{display:none}
+.thumb{position:relative;width:60px;height:60px;border-radius:9px;overflow:hidden;border:1px solid var(--line);background:#0f141b;flex:0 0 auto}
+.thumb img{width:100%;height:100%;object-fit:cover;display:block;cursor:zoom-in}
+.thumb .x{position:absolute;top:2px;right:2px;width:17px;height:17px;border-radius:50%;background:rgba(0,0,0,.68);
+  display:grid;place-items:center;font-size:12px;line-height:1;cursor:pointer;color:#fff;opacity:0;transition:.15s}
+.thumb:hover .x{opacity:1}
+.thumb .x:hover{background:var(--err)}
+.thumb .tag{position:absolute;left:0;right:0;bottom:0;font-size:9px;text-align:center;padding:1px 0;
+  background:rgba(79,140,255,.9);color:#fff;letter-spacing:.05em}
+.thumb.add{border-style:dashed;display:grid;place-items:center;color:var(--muted);font-size:22px;cursor:pointer}
+.thumb.add:hover{border-color:var(--accent);color:var(--accent)}
+.composer-bar{display:flex;align-items:center;gap:6px;padding-top:6px;border-top:1px dashed var(--line);flex-wrap:wrap}
+.composer-bar .spacer{flex:1}
+.icon-btn{display:inline-flex;align-items:center;gap:5px;background:transparent;border:1px solid var(--line);
+  border-radius:8px;padding:5px 10px;font-size:12px;cursor:pointer;color:var(--muted);transition:.15s}
+.icon-btn:hover{border-color:var(--accent);color:var(--text);background:rgba(79,140,255,.08)}
+.icon-btn.on{border-color:var(--accent);color:#9dc0ff;background:rgba(79,140,255,.12)}
+details.mini{margin-top:10px;border-radius:9px}
+details.mini > summary{padding:7px 10px;font-size:11px;text-transform:none;letter-spacing:0}
+details.mini > pre,details.mini > textarea{margin:0 10px 10px;width:calc(100% - 20px);border-top:none}
 /* 结果区 */
 .meta{display:flex;flex-wrap:wrap;gap:8px}
 .chip{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 11px;font-size:12px;display:flex;gap:7px;align-items:baseline}
@@ -200,13 +227,25 @@ pre{margin:0;padding:12px 14px;border-top:1px solid var(--line);background:#0a0e
       </div>
 
       <div class="card">
-        <h2>提示词 <span class="hint" id="promptCount">0 字</span></h2>
-        <textarea id="prompt" placeholder="描述画面主体、场景、构图、风格、光线，以及需要保留或修改的部分…"></textarea>
-        <div class="btn-row" style="margin-top:10px">
-          <button class="btn sm" data-sample="gen">示例：文生图</button>
-          <button class="btn sm" data-sample="edit">示例：编辑</button>
-          <button class="btn sm" id="btnClearPrompt">清空</button>
+        <h2>提示词与参考图 <span class="hint" id="promptCount">0 字</span></h2>
+        <div class="composer" id="composer">
+          <div class="thumbs" id="thumbStrip"></div>
+          <textarea id="prompt" placeholder="描述画面主体、场景、构图、风格、光线，以及需要保留或修改的部分…&#10;需要改图？点左下角「上传样图」，或直接把图片拖进来 / 粘贴进来"></textarea>
+          <div class="composer-bar">
+            <button class="icon-btn" id="btnUpload" title="上传样图作为参考图（最多 16 张）">🖼 上传样图</button>
+            <button class="icon-btn" id="btnMask" title="上传 PNG 蒙版：透明区域 = 要重绘的区域">◐ 蒙版</button>
+            <span class="hint" id="dropHint">可拖拽 / 粘贴</span>
+            <span class="spacer"></span>
+            <button class="btn sm" data-sample="auto" title="按当前模式填入一段示例提示词">示例</button>
+            <button class="btn sm" id="btnClearPrompt">清空</button>
+          </div>
         </div>
+        <input type="file" id="refFiles" accept="image/*" multiple class="hidden">
+        <input type="file" id="maskFile" accept="image/png,image/*" class="hidden">
+        <details class="mini" id="urlBox">
+          <summary>用图片 URL 代替本地文件</summary>
+          <textarea id="refUrls" style="min-height:56px" placeholder="每行一个 URL，可与本地样图混用&#10;https://example.com/product.png"></textarea>
+        </details>
       </div>
 
       <div class="card">
@@ -328,33 +367,7 @@ pre{margin:0;padding:12px 14px;border-top:1px solid var(--line);background:#0a0e
             <input type="text" id="pUser" placeholder="留空即可">
           </div>
 
-          <label class="check"><input type="checkbox" id="asyncPoll"> 异步网关模式：返回 task_id 时自动轮询任务结果</label>
-          <div class="field" id="wrapTaskPath">
-            <label>任务查询路径</label>
-            <input type="text" id="taskPath" value="/v1/tasks/{id}">
-            <span class="hint">{id} 会被替换为返回的 task_id</span>
-          </div>
-        </div>
-      </div>
-
-      <div class="card hidden" id="cardEdit">
-        <h2>参考图与蒙版</h2>
-        <div class="row">
-          <div class="field">
-            <label>参考图（最多 16 张）</label>
-            <input type="file" id="refFiles" accept="image/*" multiple>
-            <div class="files" id="refList"></div>
-          </div>
-          <div class="field">
-            <label>参考图 URL（每行一个，可与本地文件混用）</label>
-            <textarea id="refUrls" style="min-height:60px" placeholder="https://example.com/product.png"></textarea>
-          </div>
-          <div class="field">
-            <label>蒙版 mask（PNG，透明区域 = 要重绘的区域；尺寸需与第一张参考图一致）</label>
-            <input type="file" id="maskFile" accept="image/png,image/*">
-            <div class="files" id="maskList"></div>
-          </div>
-          <div class="row c2">
+          <div class="row c2 hidden" id="wrapEditParams">
             <div class="field">
               <label>编辑请求格式</label>
               <select id="editFormat">
@@ -370,6 +383,13 @@ pre{margin:0;padding:12px 14px;border-top:1px solid var(--line);background:#0a0e
                 <option value="high">high（更贴近原图）</option>
               </select>
             </div>
+          </div>
+
+          <label class="check"><input type="checkbox" id="asyncPoll"> 异步网关模式：返回 task_id 时自动轮询任务结果</label>
+          <div class="field" id="wrapTaskPath">
+            <label>任务查询路径</label>
+            <input type="text" id="taskPath" value="/v1/tasks/{id}">
+            <span class="hint">{id} 会被替换为返回的 task_id</span>
           </div>
         </div>
       </div>
@@ -555,7 +575,7 @@ function refreshModelIds(){
 }
 function updateVisibility(){
   var isEdit = state.mode === "edit";
-  $("#cardEdit").classList.toggle("hidden", !isEdit);
+  $("#wrapEditParams").classList.toggle("hidden", !isEdit);
   var ratioMode = $("#sizeMode").value === "ratio";
   $("#wrapRatio").classList.toggle("hidden", !ratioMode);
   $("#wrapPixelSize").classList.toggle("hidden", ratioMode);
@@ -995,13 +1015,15 @@ $("#lockSnapshot").addEventListener("change", function(){ refreshModelIds(); ref
 $("#customModel").addEventListener("input", function(){ refreshModelIds(); refreshCost(); refreshPreview(); });
 $("#effModel").addEventListener("focus", function(){ this.select(); });
 
+function setMode(mode, auto){
+  state.mode = mode;
+  document.querySelectorAll(".tab").forEach(function(x){ x.classList.toggle("on", x.dataset.mode === mode); });
+  updateVisibility();
+  refreshPreview();
+  if (auto) logLine(mode === "edit" ? "检测到样图，已自动切换到「图生图 / 编辑」模式" : "样图已清空，已切回「文生图」模式");
+}
 document.querySelectorAll(".tab").forEach(function(t){
-  t.addEventListener("click", function(){
-    document.querySelectorAll(".tab").forEach(function(x){ x.classList.remove("on"); });
-    t.classList.add("on");
-    state.mode = t.dataset.mode;
-    updateVisibility(); refreshPreview();
-  });
+  t.addEventListener("click", function(){ setMode(t.dataset.mode, false); });
 });
 
 $("#sizeMode").addEventListener("change", function(){ updateVisibility(); refreshCost(); refreshPreview(); });
@@ -1017,43 +1039,93 @@ $("#prompt").addEventListener("input", function(){
   $("#promptCount").textContent = this.value.length + " 字";
 });
 document.querySelectorAll("[data-sample]").forEach(function(b){
-  b.addEventListener("click", function(){ $("#prompt").value = SAMPLES[b.dataset.sample]; $("#prompt").dispatchEvent(new Event("input")); });
+  b.addEventListener("click", function(){
+    var key = b.dataset.sample === "auto" ? (state.mode === "edit" ? "edit" : "gen") : b.dataset.sample;
+    $("#prompt").value = SAMPLES[key];
+    $("#prompt").dispatchEvent(new Event("input"));
+  });
 });
 $("#btnClearPrompt").addEventListener("click", function(){ $("#prompt").value = ""; $("#prompt").dispatchEvent(new Event("input")); });
 
+/* ---- 样图：按钮上传 / 拖拽 / 粘贴 ---- */
+function addRefFiles(list){
+  var arr = Array.prototype.slice.call(list || []).filter(function(f){ return f && /^image\//.test(f.type || ""); });
+  if (!arr.length) return;
+  state.refFiles = state.refFiles.concat(arr);
+  if (state.refFiles.length > 16){ state.refFiles = state.refFiles.slice(0, 16); toast("最多 16 张参考图"); }
+  if (state.mode !== "edit") setMode("edit", true);
+  renderFiles();
+}
 $("#refFiles").addEventListener("change", function(){
-  state.refFiles = state.refFiles.concat(Array.prototype.slice.call(this.files));
-  if (state.refFiles.length > 16){ state.refFiles = state.refFiles.slice(0,16); toast("最多 16 张参考图"); }
+  addRefFiles(this.files);
+  this.value = "";
+});
+$("#maskFile").addEventListener("change", function(){
+  if (this.files[0]){
+    state.maskFile = this.files[0];
+    if (state.mode !== "edit") setMode("edit", true);
+  }
   this.value = "";
   renderFiles();
 });
-$("#maskFile").addEventListener("change", function(){
-  state.maskFile = this.files[0] || null;
-  renderFiles();
+$("#btnUpload").addEventListener("click", function(){ $("#refFiles").click(); });
+$("#btnMask").addEventListener("click", function(){ $("#maskFile").click(); });
+
+var composerEl = $("#composer");
+composerEl.addEventListener("dragover", function(e){ e.preventDefault(); composerEl.classList.add("drag"); });
+composerEl.addEventListener("dragleave", function(e){ if (!composerEl.contains(e.relatedTarget)) composerEl.classList.remove("drag"); });
+composerEl.addEventListener("drop", function(e){
+  e.preventDefault(); composerEl.classList.remove("drag");
+  if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length) addRefFiles(e.dataTransfer.files);
 });
+$("#prompt").addEventListener("paste", function(e){
+  var items = (e.clipboardData && e.clipboardData.items) || [];
+  var files = [];
+  for (var i = 0; i < items.length; i++){
+    if (items[i].kind === "file"){
+      var f = items[i].getAsFile();
+      if (f) files.push(f);
+    }
+  }
+  if (files.length){ e.preventDefault(); addRefFiles(files); toast("已粘贴 " + files.length + " 张样图"); }
+});
+
 function objectUrl(file){
   try { return URL.createObjectURL(file); } catch (e) { return ""; }
 }
 function renderFiles(){
-  var box = $("#refList"); box.innerHTML = "";
+  var box = $("#thumbStrip"); box.innerHTML = "";
   state.refFiles.forEach(function(f, i){
-    var chip = document.createElement("div"); chip.className = "fchip";
+    var t = document.createElement("div"); t.className = "thumb"; t.title = f.name;
     var img = document.createElement("img"); img.src = objectUrl(f);
-    var nm = document.createElement("span"); nm.textContent = f.name.slice(0, 18);
-    var x = document.createElement("span"); x.className = "x"; x.textContent = "×";
-    x.onclick = function(){ state.refFiles.splice(i,1); renderFiles(); };
-    chip.appendChild(img); chip.appendChild(nm); chip.appendChild(x); box.appendChild(chip);
+    img.onclick = function(){ openViewer(img.src); };
+    var x = document.createElement("span"); x.className = "x"; x.textContent = "×"; x.title = "移除这张样图";
+    x.onclick = function(ev){
+      ev.stopPropagation();
+      state.refFiles.splice(i, 1);
+      if (!state.refFiles.length && state.mode === "edit") setMode("gen", true);
+      renderFiles();
+    };
+    t.appendChild(img); t.appendChild(x); box.appendChild(t);
   });
-  var mb = $("#maskList"); mb.innerHTML = "";
   if (state.maskFile){
-    var c2 = document.createElement("div"); c2.className = "fchip";
-    var i2 = document.createElement("img"); i2.src = objectUrl(state.maskFile);
-    var n2 = document.createElement("span"); n2.textContent = "蒙版：" + state.maskFile.name.slice(0,16);
-    var x2 = document.createElement("span"); x2.className = "x"; x2.textContent = "×";
-    x2.onclick = function(){ state.maskFile = null; $("#maskFile").value = ""; renderFiles(); };
-    c2.appendChild(i2); c2.appendChild(n2); c2.appendChild(x2); mb.appendChild(c2);
+    var tm = document.createElement("div"); tm.className = "thumb"; tm.title = "蒙版：" + state.maskFile.name;
+    var im = document.createElement("img"); im.src = objectUrl(state.maskFile);
+    im.onclick = function(){ openViewer(im.src); };
+    var xm = document.createElement("span"); xm.className = "x"; xm.textContent = "×"; xm.title = "移除蒙版";
+    xm.onclick = function(){ state.maskFile = null; $("#maskFile").value = ""; renderFiles(); };
+    var tg = document.createElement("span"); tg.className = "tag"; tg.textContent = "蒙版";
+    tm.appendChild(im); tm.appendChild(xm); tm.appendChild(tg); box.appendChild(tm);
   }
+  if (state.refFiles.length < 16){
+    var add = document.createElement("div"); add.className = "thumb add"; add.textContent = "+"; add.title = "添加样图";
+    add.onclick = function(){ $("#refFiles").click(); };
+    box.appendChild(add);
+  }
+  $("#btnUpload").classList.toggle("on", state.refFiles.length > 0);
+  $("#btnMask").classList.toggle("on", !!state.maskFile);
 }
+renderFiles();
 
 $("#btnRun").addEventListener("click", run);
 $("#btnStop").addEventListener("click", function(){
