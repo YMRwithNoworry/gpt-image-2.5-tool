@@ -1,0 +1,1122 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GPT Image 2.5 调用工具 · Flare / Sunburst</title>
+<style>
+:root{
+  --bg:#0b0e13; --panel:#141a22; --panel2:#1a222c; --line:#26313d;
+  --text:#e8eef5; --muted:#8698ab; --accent:#4f8cff; --accent2:#22c55e;
+  --warn:#f0a132; --err:#f2555a; --radius:12px;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{
+  margin:0;background:radial-gradient(1200px 700px at 15% -10%,#16233a 0%,transparent 60%),var(--bg);
+  color:var(--text);font:14px/1.6 "Segoe UI","Microsoft YaHei",system-ui,-apple-system,sans-serif;
+}
+button,input,select,textarea{font:inherit;color:inherit}
+h1,h2,h3,p{margin:0}
+a{color:var(--accent)}
+.app{display:flex;flex-direction:column;height:100vh;overflow:hidden}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;
+  padding:12px 20px;border-bottom:1px solid var(--line);background:rgba(20,26,34,.75);backdrop-filter:blur(8px)}
+.brand{display:flex;align-items:center;gap:12px}
+.logo{width:34px;height:34px;border-radius:10px;display:grid;place-items:center;font-size:18px;
+  background:linear-gradient(135deg,#4f8cff,#a855f7);color:#fff}
+.brand h1{font-size:15px;font-weight:600;letter-spacing:.2px}
+.brand p{font-size:12px;color:var(--muted)}
+.status{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
+.dot{width:9px;height:9px;border-radius:50%;background:#4b5a6b;box-shadow:0 0 0 4px rgba(75,90,107,.15)}
+.dot.run{background:var(--accent);box-shadow:0 0 0 4px rgba(79,140,255,.18);animation:pulse 1.1s infinite}
+.dot.ok{background:var(--accent2);box-shadow:0 0 0 4px rgba(34,197,94,.18)}
+.dot.err{background:var(--err);box-shadow:0 0 0 4px rgba(242,85,90,.18)}
+@keyframes pulse{50%{opacity:.35}}
+main{flex:1;display:grid;grid-template-columns:minmax(380px,460px) 1fr;gap:0;overflow:hidden}
+.col-left{overflow-y:auto;padding:16px;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:14px}
+.col-right{overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:14px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);padding:14px}
+.card > h2{font-size:12px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;color:var(--muted);margin-bottom:12px;
+  display:flex;align-items:center;justify-content:space-between;gap:8px}
+.row{display:grid;gap:10px}
+.row.c2{grid-template-columns:1fr 1fr}
+.row.c3{grid-template-columns:1fr 1fr 1fr}
+.field{display:flex;flex-direction:column;gap:5px;min-width:0}
+.field > label{font-size:12px;color:var(--muted);display:flex;align-items:center;gap:6px}
+.field .hint{font-size:11px;color:#5f7186}
+input[type=text],input[type=password],input[type=number],select,textarea{
+  width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:9px;padding:8px 10px;outline:none;transition:.15s}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(79,140,255,.14)}
+textarea{resize:vertical;min-height:96px;line-height:1.6}
+select{cursor:pointer}
+input[type=range]{width:100%;accent-color:var(--accent)}
+input[type=file]{font-size:12px;color:var(--muted);width:100%}
+.check{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--text);cursor:pointer;user-select:none}
+.check input{accent-color:var(--accent);width:15px;height:15px}
+.btn{border:1px solid var(--line);background:var(--panel2);border-radius:9px;padding:8px 14px;cursor:pointer;transition:.15s}
+.btn:hover{border-color:#3b4c60;background:#212b37}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+.btn.primary{background:linear-gradient(135deg,#4f8cff,#3b6fe0);border-color:transparent;color:#fff;font-weight:600}
+.btn.primary:hover{filter:brightness(1.08)}
+.btn.danger{background:#3a1f22;border-color:#5c2a2f;color:#ff9ba0}
+.btn.sm{padding:5px 10px;font-size:12px;border-radius:7px}
+.btn-row{display:flex;gap:10px}
+.btn-row .btn{flex:1}
+/* 模型卡片 */
+.models{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.mcard{position:relative;border:1px solid var(--line);background:var(--panel2);border-radius:11px;padding:11px;cursor:pointer;transition:.15s}
+.mcard:hover{border-color:#3b4c60}
+.mcard.on{border-color:var(--accent);background:linear-gradient(180deg,rgba(79,140,255,.14),rgba(79,140,255,.03));
+  box-shadow:0 0 0 3px rgba(79,140,255,.12)}
+.mcard input{position:absolute;opacity:0;pointer-events:none}
+.mcard .nm{font-weight:600;font-size:13px;display:flex;align-items:center;gap:6px}
+.mcard .tag{font-size:10px;padding:1px 6px;border-radius:20px;background:rgba(79,140,255,.18);color:#9dc0ff;border:1px solid rgba(79,140,255,.3)}
+.mcard .ds{font-size:11px;color:var(--muted);margin-top:5px;line-height:1.5}
+.mcard .mid{font-size:10px;color:#5f7186;margin-top:6px;font-family:ui-monospace,Consolas,monospace;word-break:break-all}
+/* tabs */
+.tabs{display:flex;gap:6px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:4px}
+.tab{flex:1;text-align:center;padding:7px;border-radius:7px;cursor:pointer;font-size:13px;color:var(--muted);transition:.15s}
+.tab.on{background:var(--accent);color:#fff;font-weight:600}
+/* 结果区 */
+.meta{display:flex;flex-wrap:wrap;gap:8px}
+.chip{background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 11px;font-size:12px;display:flex;gap:7px;align-items:baseline}
+.chip b{font-weight:600;color:var(--text)}
+.chip span{color:var(--muted)}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px}
+.tile{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden;display:flex;flex-direction:column}
+.tile .ph{position:relative;background:#0a0d12 repeating-conic-gradient(#141a22 0 25%,#0f141b 0 50%) 0 0/18px 18px;min-height:180px;display:grid;place-items:center}
+.tile img{width:100%;display:block;cursor:zoom-in}
+.tile .badge{position:absolute;top:8px;left:8px;font-size:10px;background:rgba(0,0,0,.6);border:1px solid var(--line);border-radius:6px;padding:2px 7px;color:#cfe0f5}
+.tile .ops{display:flex;gap:6px;padding:8px;border-top:1px solid var(--line)}
+.tile .ops .btn{flex:1;text-align:center;text-decoration:none;font-size:12px;padding:6px}
+.empty{border:1px dashed var(--line);border-radius:var(--radius);padding:46px 20px;text-align:center;color:var(--muted)}
+.empty .big{font-size:30px;opacity:.5;margin-bottom:8px}
+details{background:var(--panel);border:1px solid var(--line);border-radius:var(--radius);overflow:hidden}
+details > summary{cursor:pointer;padding:11px 14px;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);list-style:none}
+details > summary::-webkit-details-marker{display:none}
+details > summary::before{content:"▸ ";color:var(--accent)}
+details[open] > summary::before{content:"▾ "}
+pre{margin:0;padding:12px 14px;border-top:1px solid var(--line);background:#0a0e14;font:12px/1.6 ui-monospace,Consolas,"Courier New",monospace;
+  overflow:auto;max-height:340px;white-space:pre-wrap;word-break:break-all;color:#b9cbe0}
+.log{font:12px/1.7 ui-monospace,Consolas,monospace;max-height:200px;overflow:auto;color:var(--muted)}
+.log .e{color:#ff9ba0}
+.log .s{color:#7ee2a8}
+.log .w{color:#ffcf7a}
+.files{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.fchip{display:flex;align-items:center;gap:6px;background:var(--panel2);border:1px solid var(--line);border-radius:7px;padding:4px 8px;font-size:11px;max-width:100%}
+.fchip img{width:26px;height:26px;object-fit:cover;border-radius:4px}
+.fchip .x{cursor:pointer;color:var(--muted)}
+.fchip .x:hover{color:var(--err)}
+.viewer{position:fixed;inset:0;background:rgba(5,8,12,.92);display:none;place-items:center;z-index:99;padding:30px}
+.viewer.on{display:grid}
+.viewer img{max-width:100%;max-height:100%;border-radius:10px}
+.viewer .close{position:absolute;top:16px;right:22px;font-size:26px;cursor:pointer;color:#cfe0f5}
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:#1d2733;border:1px solid var(--line);
+  border-radius:10px;padding:10px 18px;font-size:13px;opacity:0;pointer-events:none;transition:.25s;z-index:100}
+.toast.on{opacity:1}
+.hidden{display:none !important}
+@media (max-width:1080px){
+  main{grid-template-columns:1fr;grid-template-rows:auto 1fr}
+  .col-left{border-right:none;border-bottom:1px solid var(--line);max-height:52vh}
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="topbar">
+    <div class="brand">
+      <div class="logo">◈</div>
+      <div>
+        <h1>GPT Image 2.5 调用工具</h1>
+        <p>gpt-image-2.5-flare / gpt-image-2.5-sunburst · 全参数支持</p>
+      </div>
+    </div>
+    <div class="status"><span id="statusDot" class="dot"></span><span id="statusText">就绪</span></div>
+  </header>
+
+  <main>
+    <section class="col-left">
+
+      <div class="card">
+        <h2>接口配置 <button class="btn sm" id="btnReset">恢复默认</button></h2>
+        <div class="row">
+          <div class="field">
+            <label>Base URL</label>
+            <input type="text" id="baseUrl" placeholder="https://api.openai.com">
+            <span class="hint">官方填 https://api.openai.com；第三方中转填对应地址（不要带 /v1）</span>
+          </div>
+          <div class="field">
+            <label>API Key <span class="hint">仅保存在本机浏览器</span></label>
+            <input type="password" id="apiKey" placeholder="sk-...">
+          </div>
+          <div class="row c2">
+            <div class="field"><label>组织 ID（可选）</label><input type="text" id="orgId" placeholder="org-..."></div>
+            <div class="field"><label>项目 ID（可选）</label><input type="text" id="projectId" placeholder="proj_..."></div>
+          </div>
+          <div class="row c2">
+            <div class="field"><label>超时（秒）</label><input type="number" id="timeoutSec" min="10" max="900" step="10"></div>
+            <div class="field"><label>429 自动重试次数</label><input type="number" id="retryCount" min="0" max="5" step="1"></div>
+          </div>
+          <label class="check"><input type="checkbox" id="rememberCfg"> 记住配置（含 API Key，存 localStorage）</label>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>模型选择</h2>
+        <div class="models">
+          <label class="mcard on" id="cardFlare">
+            <input type="radio" name="model" value="flare" checked>
+            <div class="nm">Flare <span class="tag">默认 · 快</span></div>
+            <div class="ds">通用首选。日常出图、批量生成、快速原型，延迟比上一代低约 50%。</div>
+            <div class="mid" id="idFlare">gpt-image-2.5-flare</div>
+          </label>
+          <label class="mcard" id="cardSunburst">
+            <input type="radio" name="model" value="sunburst">
+            <div class="nm">Sunburst <span class="tag">精修 · 准</span></div>
+            <div class="ds">编辑精度优先。保留原图细节、只改指定区域，适合商品图与广告素材。</div>
+            <div class="mid" id="idSunburst">gpt-image-2.5-sunburst</div>
+          </label>
+        </div>
+        <div class="row" style="margin-top:12px">
+          <label class="check"><input type="checkbox" id="lockSnapshot"> 锁定快照版本（-2026-09-08），生产环境更稳定</label>
+          <div class="field">
+            <label>自定义模型 ID（填写后覆盖上面的选择）</label>
+            <input type="text" id="customModel" placeholder="留空则使用所选模型">
+          </div>
+          <div class="field">
+            <label>实际请求模型</label>
+            <input type="text" id="effModel" readonly style="background:#0f141b;color:#9dc0ff">
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>任务模式</h2>
+        <div class="tabs">
+          <div class="tab on" data-mode="gen">文生图</div>
+          <div class="tab" data-mode="edit">图生图 / 编辑</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>提示词 <span class="hint" id="promptCount">0 字</span></h2>
+        <textarea id="prompt" placeholder="描述画面主体、场景、构图、风格、光线，以及需要保留或修改的部分…"></textarea>
+        <div class="btn-row" style="margin-top:10px">
+          <button class="btn sm" data-sample="gen">示例：文生图</button>
+          <button class="btn sm" data-sample="edit">示例：编辑</button>
+          <button class="btn sm" id="btnClearPrompt">清空</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>生成参数 <span class="hint" id="costHint"></span></h2>
+        <div class="row">
+          <div class="row c2">
+            <div class="field"><label>数量 n</label><input type="number" id="pN" min="1" max="4" step="1" value="1"></div>
+            <div class="field">
+              <label>质量 quality</label>
+              <select id="pQuality">
+                <option value="auto" selected>auto（模型自选）</option>
+                <option value="low">low</option>
+                <option value="medium">medium</option>
+                <option value="high">high</option>
+                <option value="xhigh">xhigh（2.5 新增）</option>
+                <option value="max">max（2.5 新增）</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>尺寸格式</label>
+            <select id="sizeMode">
+              <option value="pixel" selected>精确像素（官方推荐写法）</option>
+              <option value="ratio">宽高比 + 分辨率（部分网关写法）</option>
+            </select>
+          </div>
+
+          <div class="field" id="wrapPixelSize">
+            <label>size（像素）</label>
+            <select id="pSize">
+              <optgroup label="官方推荐">
+                <option value="auto">auto（由模型决定）</option>
+                <option value="1024x1024" selected>1024x1024 · 1:1 方图</option>
+                <option value="1536x1024">1536x1024 · 3:2 横图</option>
+                <option value="1024x1536">1024x1536 · 2:3 竖图</option>
+              </optgroup>
+              <optgroup label="扩展尺寸">
+                <option value="1024x768">1024x768 · 4:3</option>
+                <option value="768x1024">768x1024 · 3:4</option>
+                <option value="1280x1024">1280x1024 · 5:4</option>
+                <option value="1024x1280">1024x1280 · 4:5</option>
+                <option value="1536x864">1536x864 · 16:9</option>
+                <option value="864x1536">864x1536 · 9:16</option>
+                <option value="2048x1024">2048x1024 · 2:1</option>
+                <option value="1024x2048">1024x2048 · 1:2</option>
+                <option value="2016x864">2016x864 · 21:9</option>
+                <option value="864x2016">864x2016 · 9:21</option>
+                <option value="1536x512">1536x512 · 3:1</option>
+                <option value="512x1536">512x1536 · 1:3</option>
+                <option value="2048x2048">2048x2048 · 1:1 @2K</option>
+                <option value="2048x1360">2048x1360 · 3:2 @2K</option>
+                <option value="1360x2048">1360x2048 · 2:3 @2K</option>
+                <option value="2048x1536">2048x1536 · 4:3 @2K</option>
+                <option value="1536x2048">1536x2048 · 3:4 @2K</option>
+                <option value="2560x2048">2560x2048 · 5:4 @2K</option>
+                <option value="2048x2560">2048x2560 · 4:5 @2K</option>
+                <option value="2880x2880">2880x2880 · 1:1 @4K</option>
+                <option value="3840x2160">3840x2160 · 16:9 @4K</option>
+              </optgroup>
+              <optgroup label="自定义">
+                <option value="custom">自定义宽高…</option>
+              </optgroup>
+            </select>
+            <span class="hint">自定义要求：宽高均为 16 的倍数、单边 ≤ 3840、长短边比 ≤ 3:1</span>
+          </div>
+
+          <div class="row c2 hidden" id="wrapCustomSize">
+            <div class="field"><label>宽 W</label><input type="number" id="pW" value="1024" step="16" min="256" max="3840"></div>
+            <div class="field"><label>高 H</label><input type="number" id="pH" value="1024" step="16" min="256" max="3840"></div>
+          </div>
+
+          <div class="row c2 hidden" id="wrapRatio">
+            <div class="field">
+              <label>宽高比 size</label>
+              <select id="pRatio">
+                <option value="1:1" selected>1:1</option><option value="3:2">3:2</option><option value="2:3">2:3</option>
+                <option value="4:3">4:3</option><option value="3:4">3:4</option><option value="5:4">5:4</option>
+                <option value="4:5">4:5</option><option value="16:9">16:9</option><option value="9:16">9:16</option>
+                <option value="2:1">2:1</option><option value="1:2">1:2</option><option value="21:9">21:9</option>
+                <option value="9:21">9:21</option><option value="3:1">3:1</option><option value="1:3">1:3</option>
+              </select>
+            </div>
+            <div class="field">
+              <label>分辨率 resolution</label>
+              <select id="pResolution"><option value="1k" selected>1k</option><option value="2k">2k</option><option value="4k">4k</option></select>
+            </div>
+          </div>
+
+          <div class="row c2">
+            <div class="field">
+              <label>输出格式 output_format</label>
+              <select id="pFormat"><option value="png" selected>png（支持透明）</option><option value="jpeg">jpeg（更快更小）</option><option value="webp">webp</option></select>
+            </div>
+            <div class="field">
+              <label>背景 background</label>
+              <select id="pBackground"><option value="auto" selected>auto</option><option value="opaque">opaque 不透明</option><option value="transparent">transparent 透明</option></select>
+            </div>
+          </div>
+
+          <div class="field" id="wrapCompression">
+            <label>压缩率 output_compression <b id="compVal" style="color:#9dc0ff">80</b> <span class="hint">仅 jpeg / webp 生效</span></label>
+            <input type="range" id="pCompression" min="0" max="100" step="1" value="80">
+          </div>
+
+          <div class="row c2">
+            <div class="field">
+              <label>内容审核 moderation</label>
+              <select id="pModeration"><option value="auto" selected>auto</option><option value="low">low（放宽）</option></select>
+            </div>
+            <div class="field">
+              <label>流式分片 partial_images</label>
+              <select id="pPartials"><option value="0" selected>0 关闭</option><option value="1">1</option><option value="2">2</option><option value="3">3</option></select>
+            </div>
+          </div>
+
+          <div class="field">
+            <label>user 标识（可选，用于风控追踪）</label>
+            <input type="text" id="pUser" placeholder="留空即可">
+          </div>
+
+          <label class="check"><input type="checkbox" id="asyncPoll"> 异步网关模式：返回 task_id 时自动轮询任务结果</label>
+          <div class="field" id="wrapTaskPath">
+            <label>任务查询路径</label>
+            <input type="text" id="taskPath" value="/v1/tasks/{id}">
+            <span class="hint">{id} 会被替换为返回的 task_id</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card hidden" id="cardEdit">
+        <h2>参考图与蒙版</h2>
+        <div class="row">
+          <div class="field">
+            <label>参考图（最多 16 张）</label>
+            <input type="file" id="refFiles" accept="image/*" multiple>
+            <div class="files" id="refList"></div>
+          </div>
+          <div class="field">
+            <label>参考图 URL（每行一个，可与本地文件混用）</label>
+            <textarea id="refUrls" style="min-height:60px" placeholder="https://example.com/product.png"></textarea>
+          </div>
+          <div class="field">
+            <label>蒙版 mask（PNG，透明区域 = 要重绘的区域；尺寸需与第一张参考图一致）</label>
+            <input type="file" id="maskFile" accept="image/png,image/*">
+            <div class="files" id="maskList"></div>
+          </div>
+          <div class="field">
+            <label>编辑请求格式</label>
+            <select id="editFormat">
+              <option value="multipart" selected>multipart/form-data（OpenAI 官方 /v1/images/edits）</option>
+              <option value="json">JSON + image_urls（部分网关）</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn primary" id="btnRun">开始生成</button>
+        <button class="btn danger hidden" id="btnStop" style="flex:0 0 110px">停止</button>
+      </div>
+    </section>
+
+    <section class="col-right">
+      <div class="card">
+        <h2>本次请求</h2>
+        <div class="meta" id="metaBar">
+          <div class="chip"><span>模型</span><b id="mModel">—</b></div>
+          <div class="chip"><span>质量</span><b id="mQuality">—</b></div>
+          <div class="chip"><span>尺寸</span><b id="mSize">—</b></div>
+          <div class="chip"><span>预计输出 token</span><b id="mTokens">—</b></div>
+          <div class="chip"><span>预计费用</span><b id="mCost">—</b></div>
+          <div class="chip"><span>耗时</span><b id="mTime">—</b></div>
+        </div>
+        <div class="log" id="log" style="margin-top:12px"></div>
+      </div>
+
+      <div id="gallery" class="grid"></div>
+      <div class="empty" id="emptyBox">
+        <div class="big">🖼</div>
+        <div>还没有生成结果</div>
+        <div class="hint" style="font-size:12px;margin-top:6px">左侧填好 API Key 与提示词，点「开始生成」</div>
+      </div>
+
+      <div class="btn-row hidden" id="bulkOps">
+        <button class="btn" id="btnDownloadAll">下载全部</button>
+        <button class="btn" id="btnClearResults">清空结果</button>
+      </div>
+
+      <details>
+        <summary>请求预览（curl 可直接复制执行）</summary>
+        <pre id="reqPreview">—</pre>
+      </details>
+      <details>
+        <summary>原始响应 JSON</summary>
+        <pre id="rawResp">—</pre>
+      </details>
+      <details>
+        <summary>用量与计费说明</summary>
+        <pre id="usageNote">—</pre>
+      </details>
+    </section>
+  </main>
+</div>
+
+<div class="viewer" id="viewer"><span class="close" id="viewerClose">×</span><img id="viewerImg" alt=""></div>
+<div class="toast" id="toast"></div>
+
+<script>
+(function(){
+"use strict";
+
+/* ===================== 常量 ===================== */
+var PRICE = { output: 30/1e6, imageInput: 8/1e6, textInput: 5/1e6 };
+var MODEL_IDS = { flare: "gpt-image-2.5-flare", sunburst: "gpt-image-2.5-sunburst" };
+var SNAPSHOT = "-2026-09-08";
+
+/* 每张图输出 token 参考表（官方/网关公布值） */
+var TOKENS = {
+  "1024x1024":{low:196,medium:439,high:1756,xhigh:3122,max:7024},
+  "1536x1024":{low:158,medium:343,high:1372,xhigh:2459,max:5488},
+  "1024x1536":{low:158,medium:343,high:1372,xhigh:2459,max:5488},
+  "1024x768":{low:134,medium:301,high:1204,xhigh:2140,max:4815},
+  "768x1024":{low:134,medium:301,high:1204,xhigh:2140,max:4815},
+  "1280x1024":{low:173,medium:378,high:1510,xhigh:2702,max:6119},
+  "1024x1280":{low:173,medium:378,high:1510,xhigh:2702,max:6119},
+  "1536x864":{low:120,medium:280,high:1078,xhigh:1917,max:4312},
+  "864x1536":{low:120,medium:280,high:1078,xhigh:1917,max:4312},
+  "2048x1024":{low:132,medium:295,high:1180,xhigh:2098,max:4720},
+  "1024x2048":{low:132,medium:295,high:1180,xhigh:2098,max:4720},
+  "2016x864":{low:105,medium:225,high:943,xhigh:1617,max:3682},
+  "864x2016":{low:105,medium:225,high:943,xhigh:1617,max:3682},
+  "1536x512":{low:56,medium:134,high:535,xhigh:937,max:2140},
+  "512x1536":{low:56,medium:134,high:535,xhigh:937,max:2140},
+  "2048x2048":{low:397,medium:892,high:3568,xhigh:6343,max:14272},
+  "2048x1360":{low:211,medium:460,high:1838,xhigh:3216,max:7351},
+  "1360x2048":{low:211,medium:460,high:1838,xhigh:3216,max:7351},
+  "2048x1536":{low:247,medium:556,high:2223,xhigh:3952,max:8892},
+  "1536x2048":{low:247,medium:556,high:2223,xhigh:3952,max:8892},
+  "2560x2048":{low:377,medium:826,high:3303,xhigh:5911,max:13385},
+  "2048x2560":{low:377,medium:826,high:3303,xhigh:5911,max:13385}
+};
+/* 比例 + 分辨率 -> 像素，用于估算 */
+var RATIO_PX = {
+  "1:1":{ "1k":"1024x1024","2k":"2048x2048","4k":"2880x2880" },
+  "3:2":{ "1k":"1536x1024","2k":"2048x1360","4k":"3520x2336" },
+  "2:3":{ "1k":"1024x1536","2k":"1360x2048","4k":"2336x3520" },
+  "4:3":{ "1k":"1024x768","2k":"2048x1536","4k":"3312x2480" },
+  "3:4":{ "1k":"768x1024","2k":"1536x2048","4k":"2480x3312" },
+  "5:4":{ "1k":"1280x1024","2k":"2560x2048","4k":"3216x2576" },
+  "4:5":{ "1k":"1024x1280","2k":"2048x2560","4k":"2576x3216" },
+  "16:9":{ "1k":"1536x864","2k":"2048x1152","4k":"3840x2160" },
+  "9:16":{ "1k":"864x1536","2k":"1152x2048","4k":"2160x3840" },
+  "2:1":{ "1k":"2048x1024","2k":"2688x1344","4k":"3840x1920" },
+  "1:2":{ "1k":"1024x2048","2k":"1344x2688","4k":"1920x3840" },
+  "21:9":{ "1k":"2016x864","2k":"2688x1152","4k":"3840x1648" },
+  "9:21":{ "1k":"864x2016","2k":"1152x2688","4k":"1648x3840" },
+  "3:1":{ "1k":"1536x512","2k":"3072x1024","4k":"3840x1280" },
+  "1:3":{ "1k":"512x1536","2k":"1024x3072","4k":"1280x3840" }
+};
+
+var SAMPLES = {
+  gen: "产品摄影：哑光黑机械键盘，放在深灰水泥台面上，柔和影棚侧光，浅景深，无文字，超写实，8k 细节",
+  edit: "保留商品本体与包装上的文字完全不变，只把背景替换为柔和的米白影棚背景，并补一个自然投影"
+};
+
+var LS_KEY = "gpt-image-2.5-tool.settings";
+var $ = function(s){ return document.querySelector(s); };
+var state = { mode:"gen", running:false, results:[], refFiles:[], maskFile:null, abort:null };
+
+/* ===================== 工具函数 ===================== */
+function toast(msg){
+  var t = $("#toast"); t.textContent = msg; t.classList.add("on");
+  clearTimeout(t._tm); t._tm = setTimeout(function(){ t.classList.remove("on"); }, 2200);
+}
+function setStatus(kind, text){
+  var d = $("#statusDot"); d.className = "dot" + (kind ? " " + kind : "");
+  $("#statusText").textContent = text;
+}
+function logLine(text, cls){
+  var el = document.createElement("div");
+  if (cls) el.className = cls;
+  var t = new Date().toLocaleTimeString("zh-CN", {hour12:false});
+  el.textContent = "[" + t + "] " + text;
+  var box = $("#log"); box.appendChild(el); box.scrollTop = box.scrollHeight;
+}
+function money(v){ return "$" + (v < 0.01 ? v.toFixed(5) : v.toFixed(4)); }
+function sleep(ms){ return new Promise(function(r){ setTimeout(r, ms); }); }
+
+function currentModel(){
+  var custom = $("#customModel").value.trim();
+  if (custom) return custom;
+  var base = MODEL_IDS[document.querySelector("input[name=model]:checked").value];
+  return $("#lockSnapshot").checked ? base + SNAPSHOT : base;
+}
+function currentPixels(){
+  if ($("#sizeMode").value === "ratio"){
+    var map = RATIO_PX[$("#pRatio").value];
+    return map ? map[$("#pResolution").value] : "1024x1024";
+  }
+  var s = $("#pSize").value;
+  if (s === "custom") return $("#pW").value + "x" + $("#pH").value;
+  return s;
+}
+function estimateTokens(){
+  var px = currentPixels();
+  var q = $("#pQuality").value;
+  if (px === "auto") px = "1024x1024";
+  if (q === "auto") q = "medium";
+  var row = TOKENS[px];
+  if (row) return { tokens: row[q], exact: true };
+  var m = /^(\d+)x(\d+)$/.exec(px);
+  if (!m) return { tokens: TOKENS["1024x1024"][q], exact: false };
+  var ratio = (parseInt(m[1],10) * parseInt(m[2],10)) / (1024*1024);
+  return { tokens: Math.round(TOKENS["1024x1024"][q] * ratio), exact: false };
+}
+function refreshCost(){
+  var est = estimateTokens();
+  var n = parseInt($("#pN").value, 10) || 1;
+  var per = est.tokens * PRICE.output;
+  var total = per * n;
+  $("#costHint").textContent = (est.exact ? "" : "≈") + est.tokens + " tokens/张 · " + money(per) + "/张 · 共 " + money(total);
+  $("#mModel").textContent = currentModel();
+  $("#mQuality").textContent = $("#pQuality").value;
+  $("#mSize").textContent = ($("#sizeMode").value === "ratio")
+    ? ($("#pRatio").value + " @ " + $("#pResolution").value + " (" + currentPixels() + ")")
+    : currentPixels();
+  $("#mTokens").textContent = (est.exact ? "" : "≈") + (est.tokens * n);
+  $("#mCost").textContent = money(total) + " 输出";
+}
+function refreshModelIds(){
+  var suffix = $("#lockSnapshot").checked ? SNAPSHOT : "";
+  $("#idFlare").textContent = MODEL_IDS.flare + suffix;
+  $("#idSunburst").textContent = MODEL_IDS.sunburst + suffix;
+  $("#effModel").value = currentModel();
+}
+function updateVisibility(){
+  var isEdit = state.mode === "edit";
+  $("#cardEdit").classList.toggle("hidden", !isEdit);
+  var ratioMode = $("#sizeMode").value === "ratio";
+  $("#wrapRatio").classList.toggle("hidden", !ratioMode);
+  $("#wrapPixelSize").classList.toggle("hidden", ratioMode);
+  var custom = !ratioMode && $("#pSize").value === "custom";
+  $("#wrapCustomSize").classList.toggle("hidden", !custom);
+  var fmt = $("#pFormat").value;
+  $("#wrapCompression").classList.toggle("hidden", fmt === "png");
+  $("#btnRun").textContent = isEdit ? "开始编辑" : "开始生成";
+}
+function validate(){
+  var errs = [];
+  if (!$("#apiKey").value.trim()) errs.push("请填写 API Key");
+  if (!$("#prompt").value.trim()) errs.push("请填写提示词");
+  if ($("#pBackground").value === "transparent" && $("#pFormat").value === "jpeg")
+    errs.push("background=transparent 不能配合 jpeg，请改用 png 或 webp");
+  if ($("#sizeMode").value === "pixel" && $("#pSize").value === "custom"){
+    var w = parseInt($("#pW").value,10), h = parseInt($("#pH").value,10);
+    if (!w || !h) errs.push("自定义尺寸的宽高必须填写");
+    else {
+      if (w % 16 !== 0 || h % 16 !== 0) errs.push("自定义宽高必须是 16 的倍数");
+      if (w > 3840 || h > 3840) errs.push("自定义宽高单边不能超过 3840");
+      var long = Math.max(w,h), short = Math.min(w,h);
+      if (long / short > 3) errs.push("自定义尺寸长短边比例不能超过 3:1");
+      var px = w * h;
+      if (px < 655360 || px > 8294400) errs.push("自定义尺寸总像素需在 655,360 ~ 8,294,400 之间（当前 " + px.toLocaleString() + "）");
+    }
+  }
+  if (state.mode === "edit" && !state.refFiles.length && !$("#refUrls").value.trim())
+    errs.push("编辑模式至少需要一张参考图（本地文件或 URL）");
+  var n = parseInt($("#pN").value,10);
+  if (!(n >= 1 && n <= 4)) errs.push("数量 n 需要在 1 ~ 4 之间");
+  return errs;
+}
+
+/* ===================== 请求体构造 ===================== */
+function buildBody(){
+  var body = {
+    model: currentModel(),
+    prompt: $("#prompt").value.trim(),
+    n: parseInt($("#pN").value,10) || 1,
+    quality: $("#pQuality").value,
+    size: ($("#sizeMode").value === "ratio") ? $("#pRatio").value : ($("#pSize").value === "custom" ? $("#pW").value + "x" + $("#pH").value : $("#pSize").value),
+    output_format: $("#pFormat").value,
+    background: $("#pBackground").value,
+    moderation: $("#pModeration").value
+  };
+  if ($("#sizeMode").value === "ratio") body.resolution = $("#pResolution").value;
+  if (body.output_format !== "png") body.output_compression = parseInt($("#pCompression").value,10);
+  var partials = parseInt($("#pPartials").value,10);
+  if (partials > 0){ body.stream = true; body.partial_images = partials; }
+  var user = $("#pUser").value.trim();
+  if (user) body.user = user;
+  return body;
+}
+function buildHeaders(){
+  var h = { "Authorization": "Bearer " + $("#apiKey").value.trim() };
+  var org = $("#orgId").value.trim(), proj = $("#projectId").value.trim();
+  if (org) h["OpenAI-Organization"] = org;
+  if (proj) h["OpenAI-Project"] = proj;
+  return h;
+}
+function apiRoot(){
+  var u = $("#baseUrl").value.trim().replace(/\/+$/, "");
+  if (!u) u = "https://api.openai.com";
+  if (/\/v1$/.test(u)) u = u.slice(0, -3);
+  return u;
+}
+function curlPreview(endpoint, body, isMultipart){
+  var BS = String.fromCharCode(92), NL = String.fromCharCode(10);
+  var root = apiRoot();
+  var parts = ["curl -X POST '" + root + endpoint + "'",
+    "  -H 'Authorization: Bearer $OPENAI_API_KEY'"];
+  if (isMultipart){
+    parts.push("  -F 'model=" + body.model + "'");
+    parts.push("  -F 'prompt=" + (body.prompt || "").replace(/'/g, "") + "'");
+    parts.push("  -F 'image=@reference.png'");
+    Object.keys(body).forEach(function(k){
+      if (k === "model" || k === "prompt") return;
+      parts.push("  -F '" + k + "=" + body[k] + "'");
+    });
+  } else {
+    parts.push("  -H 'Content-Type: application/json'");
+    parts.push("  -d '" + JSON.stringify(body, null, 2) + "'");
+  }
+  return parts.join(" " + BS + NL);
+}
+function refreshPreview(){
+  var body = buildBody();
+  var isEdit = state.mode === "edit";
+  $("#reqPreview").textContent = curlPreview(isEdit ? "/v1/images/edits" : "/v1/images/generations", body, isEdit && $("#editFormat").value === "multipart");
+  var note = [
+    "计费（每 100 万 token）：图像输出 $30 · 图像输入 $8 · 文本输入 $5 · 缓存图像输入 $2",
+    "",
+    "quality 与 1024x1024 输出 token 参考：",
+    "  low 196 · medium 439 · high 1756 · xhigh 3122 · max 7024",
+    "",
+    "2.5 相对 2 代的变化：新增 xhigh / max 两档；同名 high 的 token 预算约为旧版 medium，",
+    "所以从 2 代迁移过来时，若想保持旧 high 的画质，应把 quality 调到 max。",
+    "",
+    "quality=auto 时由模型运行时决定档位，费用按实际 usage 结算。",
+    "流式 partial_images 每张分片额外计 100 输出 token。"
+  ].join("\n");
+  $("#usageNote").textContent = note;
+}
+
+/* ===================== 网络请求 ===================== */
+function fetchWithTimeout(url, opts, timeoutMs){
+  var ctrl = new AbortController();
+  var timer = setTimeout(function(){ ctrl.abort(); }, timeoutMs);
+  var onAbort = function(){ ctrl.abort(); };
+  if (state.abort) state.abort.signal.addEventListener("abort", onAbort);
+  opts.signal = ctrl.signal;
+  return fetch(url, opts).finally(function(){
+    clearTimeout(timer);
+    if (state.abort) state.abort.signal.removeEventListener("abort", onAbort);
+  });
+}
+function pickError(payload, httpStatus, statusText){
+  if (!payload) return "HTTP " + httpStatus + " " + (statusText || "");
+  if (payload.error && payload.error.message) return payload.error.message;
+  if (payload.message) return payload.message;
+  return "HTTP " + httpStatus + " " + (statusText || "") + " " + JSON.stringify(payload).slice(0, 300);
+}
+async function requestJson(url, opts, retries){
+  var timeoutMs = (parseInt($("#timeoutSec").value,10) || 180) * 1000;
+  for (var attempt = 0; ; attempt++){
+    var res;
+    try {
+      res = await fetchWithTimeout(url, opts, timeoutMs);
+    } catch (e){
+      if (e.name === "AbortError") throw new Error("请求已停止或超时（" + (timeoutMs/1000) + "s）");
+      throw new Error("网络错误：" + e.message + "（若为 CORS/跨域失败，请确认 Base URL 允许浏览器直连）");
+    }
+    var text = await res.text();
+    var json = null;
+    try { json = text ? JSON.parse(text) : null; } catch (e) { json = null; }
+    if (res.status === 429 && attempt < retries){
+      var ra = parseFloat(res.headers.get("retry-after")) || (2 + attempt * 2);
+      logLine("触发 429 限流，等待 " + ra + " 秒后重试（第 " + (attempt+1) + " 次）", "w");
+      await sleep(ra * 1000);
+      continue;
+    }
+    if (!res.ok) throw new Error(pickError(json, res.status, res.statusText));
+    if (json === null) throw new Error("响应不是合法 JSON：" + text.slice(0, 200));
+    return json;
+  }
+}
+
+/* 流式 SSE */
+async function requestStream(url, opts, onEvent){
+  var timeoutMs = (parseInt($("#timeoutSec").value,10) || 180) * 1000;
+  var res;
+  try {
+    res = await fetchWithTimeout(url, opts, timeoutMs);
+  } catch (e){
+    if (e.name === "AbortError") throw new Error("请求已停止或超时");
+    throw new Error("网络错误：" + e.message);
+  }
+  if (!res.ok){
+    var t = await res.text(); var j = null;
+    try { j = JSON.parse(t); } catch(e){}
+    throw new Error(pickError(j, res.status, res.statusText));
+  }
+  var reader = res.body.getReader();
+  var decoder = new TextDecoder("utf-8");
+  var buf = "";
+  for (;;){
+    var chunk = await reader.read();
+    if (chunk.done) break;
+    buf += decoder.decode(chunk.value, { stream:true });
+    var parts = buf.split(/\r?\n\r?\n/);
+    buf = parts.pop();
+    for (var i = 0; i < parts.length; i++){
+      var lines = parts[i].split(/\r?\n/);
+      for (var j2 = 0; j2 < lines.length; j2++){
+        var ln = lines[j2];
+        if (ln.indexOf("data:") !== 0) continue;
+        var payload = ln.slice(5).trim();
+        if (!payload || payload === "[DONE]") continue;
+        var ev;
+        try { ev = JSON.parse(payload); } catch (e) { continue; }
+        onEvent(ev);
+      }
+    }
+  }
+}
+
+/* 异步网关：轮询 task */
+async function pollTask(taskId){
+  var tpl = $("#taskPath").value.trim() || "/v1/tasks/{id}";
+  var url = apiRoot() + tpl.replace("{id}", encodeURIComponent(taskId));
+  var deadline = Date.now() + (parseInt($("#timeoutSec").value,10) || 180) * 1000;
+  var last = "";
+  while (Date.now() < deadline){
+    await sleep(3000);
+    if (state.abort && state.abort.signal.aborted) throw new Error("已停止轮询");
+    var json = await requestJson(url, { method:"GET", headers: buildHeaders() }, 1);
+    var d = json.data || json;
+    var st = d.status || d.state || "";
+    if (st && st !== last){ logLine("任务状态：" + st + (d.progress != null ? "（" + d.progress + "%）" : "")); last = st; }
+    if (st === "completed" || st === "succeeded" || st === "success") return json;
+    if (st === "failed" || st === "error"){
+      throw new Error("任务失败：" + ((d.error && d.error.message) || d.message || "未知原因"));
+    }
+  }
+  throw new Error("任务轮询超时");
+}
+
+/* ===================== 结果渲染 ===================== */
+function extractImages(json){
+  var out = [];
+  var push = function(o){
+    if (!o) return;
+    if (typeof o === "string"){ out.push({ url:o }); return; }
+    if (o.b64_json) out.push({ b64: o.b64_json, revised: o.revised_prompt });
+    else if (o.url) out.push({ url: Array.isArray(o.url) ? o.url[0] : o.url, revised: o.revised_prompt });
+  };
+  var d = json.data;
+  if (Array.isArray(d)){
+    for (var i = 0; i < d.length; i++){
+      var item = d[i];
+      if (item && item.result && item.result.images) {
+        for (var k = 0; k < item.result.images.length; k++) push(item.result.images[k]);
+      } else push(item);
+    }
+  } else if (d && d.result && d.result.images){
+    for (var m = 0; m < d.result.images.length; m++) push(d.result.images[m]);
+  } else if (json.result && json.result.images){
+    for (var n = 0; n < json.result.images.length; n++) push(json.result.images[n]);
+  }
+  return out;
+}
+function srcOf(img){
+  if (img.dataUrl) return img.dataUrl;
+  if (img.b64) return "data:image/" + fmtExt($("#pFormat").value) + ";base64," + img.b64;
+  return img.url;
+}
+function fmtExt(f){ return f === "jpeg" ? "jpeg" : (f === "webp" ? "webp" : "png"); }
+function addTile(img, index, partial){
+  $("#emptyBox").classList.add("hidden");
+  $("#bulkOps").classList.remove("hidden");
+  var id = "tile-" + (partial ? "p" + index : index);
+  var tile = document.getElementById(id);
+  if (!tile){
+    tile = document.createElement("div");
+    tile.className = "tile"; tile.id = id;
+    tile.innerHTML = '<div class="ph"><img alt="结果图"></div>' +
+      '<div class="ops">' +
+        '<a class="btn sm dl" download>下载</a>' +
+        '<button class="btn sm open">放大</button>' +
+        '<button class="btn sm copy">复制 Base64</button>' +
+      '</div>';
+    $("#gallery").appendChild(tile);
+  }
+  var src = srcOf(img);
+  var el = tile.querySelector("img");
+  el.src = src;
+  el.onclick = function(){ openViewer(src); };
+  var name = "gpt-image-2.5-" + Date.now() + "-" + (index+1) + "." + fmtExt($("#pFormat").value);
+  var dl = tile.querySelector(".dl");
+  dl.href = src; dl.download = name;
+  tile.querySelector(".open").onclick = function(){ openViewer(src); };
+  tile.querySelector(".copy").onclick = function(){
+    var b64 = img.b64 || (src.indexOf("base64,") > -1 ? src.split("base64,")[1] : "");
+    if (!b64){ toast("该结果是 URL，没有 Base64 数据"); return; }
+    navigator.clipboard.writeText(b64).then(function(){ toast("Base64 已复制"); }, function(){ toast("复制失败"); });
+  };
+  var badge = tile.querySelector(".badge");
+  if (partial && !badge){
+    badge = document.createElement("div"); badge.className = "badge"; badge.textContent = "预览中…";
+    tile.querySelector(".ph").appendChild(badge);
+  } else if (!partial && badge){ badge.remove(); }
+  return tile;
+}
+function openViewer(src){ $("#viewerImg").src = src; $("#viewer").classList.add("on"); }
+
+function usageCost(usage){
+  if (!usage) return null;
+  var outT = usage.output_tokens || 0;
+  var inT = usage.input_tokens || 0;
+  var det = usage.input_tokens_details || {};
+  var textT = det.text_tokens || 0, imgT = det.image_tokens || 0;
+  var cost;
+  if (textT || imgT) cost = outT*PRICE.output + textT*PRICE.textInput + imgT*PRICE.imageInput;
+  else cost = outT*PRICE.output + inT*PRICE.imageInput;
+  return { outT:outT, inT:inT, textT:textT, imgT:imgT, cost:cost };
+}
+
+/* ===================== 主流程 ===================== */
+async function run(){
+  var errs = validate();
+  if (errs.length){ toast(errs[0]); errs.forEach(function(e){ logLine("参数校验：" + e, "e"); }); return; }
+
+  state.running = true;
+  state.abort = new AbortController();
+  $("#btnRun").disabled = true;
+  $("#btnStop").classList.remove("hidden");
+  setStatus("run", "请求中…");
+  $("#rawResp").textContent = "—";
+  var t0 = performance.now();
+
+  var body = buildBody();
+  var partials = parseInt($("#pPartials").value,10);
+  var isEdit = state.mode === "edit";
+  var endpoint = isEdit ? "/v1/images/edits" : "/v1/images/generations";
+  var url = apiRoot() + endpoint;
+  var headers = buildHeaders();
+
+  logLine("模型 " + body.model + " · " + body.size + " · quality=" + body.quality + " · n=" + body.n + (isEdit ? " · 编辑模式" : ""));
+
+  try {
+    var json;
+    if (isEdit && $("#editFormat").value === "multipart"){
+      var fd = new FormData();
+      Object.keys(body).forEach(function(k){
+        if (k === "stream" || k === "partial_images") return;
+        fd.append(k, String(body[k]));
+      });
+      var files = state.refFiles;
+      for (var i = 0; i < files.length; i++){
+        fd.append(files.length > 1 ? "image[]" : "image", files[i], files[i].name);
+      }
+      var urls = $("#refUrls").value.split(/\r?\n/).map(function(s){ return s.trim(); }).filter(Boolean);
+      for (var u = 0; u < urls.length; u++){
+        fd.append(files.length ? "image[]" : "image", urls[u]);
+      }
+      if (state.maskFile) fd.append("mask", state.maskFile, state.maskFile.name);
+      if (body.stream){ logLine("multipart 不支持流式预览，已忽略 partial_images", "w"); }
+      json = await requestJson(url, { method:"POST", headers: headers, body: fd }, parseInt($("#retryCount").value,10) || 0);
+    } else {
+      var payload = Object.assign({}, body);
+      if (isEdit && $("#editFormat").value === "json"){
+        var list = [];
+        for (var f = 0; f < state.refFiles.length; f++) list.push(await fileToDataUrl(state.refFiles[f]));
+        $("#refUrls").value.split(/\r?\n/).forEach(function(s){ if (s.trim()) list.push(s.trim()); });
+        payload.image_urls = list;
+        if (state.maskFile) payload.mask_url = await fileToDataUrl(state.maskFile);
+        delete payload.stream; delete payload.partial_images;
+      }
+      var opts = { method:"POST", headers: Object.assign({ "Content-Type":"application/json" }, headers), body: JSON.stringify(payload) };
+
+      if (payload.stream && partials > 0 && !(isEdit && $("#editFormat").value === "json")){
+        var collected = [];
+        await requestStream(url, opts, function(ev){
+          var type = ev.type || "";
+          var b64 = ev.b64_json || (ev.data && ev.data[0] && ev.data[0].b64_json);
+          if (b64){
+            var isPartial = type.indexOf("partial") > -1;
+            var idx = (ev.partial_image_index != null) ? ev.partial_image_index : 0;
+            addTile({ b64: b64 }, isPartial ? 900 + idx : idx, isPartial);
+            if (!isPartial) collected.push({ b64_json: b64 });
+          }
+          if (ev.usage) json = json || {}; // 保留
+          if (ev.usage) (json = json || {}).usage = ev.usage;
+          if (type) logLine("流式事件：" + type);
+        });
+        json = json || {};
+        if (collected.length) json.data = collected;
+      } else {
+        json = await requestJson(url, opts, parseInt($("#retryCount").value,10) || 0);
+      }
+    }
+
+    $("#rawResp").textContent = JSON.stringify(json, null, 2);
+
+    /* 异步网关轮询 */
+    var imgs = extractImages(json);
+    var taskId = null;
+    if (!imgs.length && json && Array.isArray(json.data) && json.data[0] && json.data[0].task_id) taskId = json.data[0].task_id;
+    if (!imgs.length && json && json.data && json.data.id && json.data.status) taskId = json.data.id;
+    if (!imgs.length && taskId){
+      if (!$("#asyncPoll").checked){
+        logLine("服务端返回异步任务 task_id=" + taskId + "，请勾选「异步网关模式」以自动轮询", "w");
+        setStatus("err", "需要轮询任务");
+        toast("返回的是异步任务，请勾选异步网关模式");
+      } else {
+        logLine("异步任务已提交：task_id=" + taskId + "，开始轮询…");
+        setStatus("run", "任务处理中…");
+        json = await pollTask(taskId);
+        $("#rawResp").textContent = JSON.stringify(json, null, 2);
+        imgs = extractImages(json);
+      }
+    }
+
+    if (!imgs.length) throw new Error("响应中没有找到图像数据，请查看原始响应 JSON");
+
+    for (var t = 0; t < imgs.length; t++) addTile(imgs[t], t, false);
+    document.querySelectorAll('#gallery .tile[id^="tile-p"]').forEach(function(el){ el.remove(); });
+    state.results = state.results.concat(imgs);
+
+    var u = json.usage || (json.data && json.data.usage) || (json.data && json.data[0] && json.data[0].usage);
+    var info = usageCost(u);
+    var secs = ((performance.now() - t0) / 1000).toFixed(1);
+    $("#mTime").textContent = secs + "s";
+    if (info){
+      logLine("完成：输出 " + info.outT + " tokens，输入 " + info.inT + " tokens，实际费用约 " + money(info.cost), "s");
+      $("#mCost").textContent = money(info.cost) + " 实际";
+    } else {
+      logLine("完成：共 " + imgs.length + " 张，耗时 " + secs + "s（响应未返回 usage）", "s");
+    }
+    setStatus("ok", "完成 · " + imgs.length + " 张");
+    toast("生成完成");
+  } catch (e){
+    logLine("失败：" + e.message, "e");
+    setStatus("err", "失败");
+    toast("失败：" + e.message.slice(0, 60));
+  } finally {
+    state.running = false;
+    state.abort = null;
+    $("#btnRun").disabled = false;
+    $("#btnStop").classList.add("hidden");
+  }
+}
+
+function fileToDataUrl(file){
+  return new Promise(function(resolve, reject){
+    var r = new FileReader();
+    r.onload = function(){ resolve(r.result); };
+    r.onerror = function(){ reject(new Error("读取文件失败：" + file.name)); };
+    r.readAsDataURL(file);
+  });
+}
+
+/* ===================== 事件绑定 ===================== */
+document.querySelectorAll("input[name=model]").forEach(function(r){
+  r.addEventListener("change", function(){
+    $("#cardFlare").classList.toggle("on", r.value === "flare" && r.checked);
+    $("#cardSunburst").classList.toggle("on", r.value === "sunburst" && r.checked);
+    refreshModelIds(); refreshCost(); refreshPreview();
+  });
+});
+$("#lockSnapshot").addEventListener("change", function(){ refreshModelIds(); refreshPreview(); });
+$("#customModel").addEventListener("input", function(){ refreshModelIds(); refreshCost(); refreshPreview(); });
+$("#effModel").addEventListener("focus", function(){ this.select(); });
+
+document.querySelectorAll(".tab").forEach(function(t){
+  t.addEventListener("click", function(){
+    document.querySelectorAll(".tab").forEach(function(x){ x.classList.remove("on"); });
+    t.classList.add("on");
+    state.mode = t.dataset.mode;
+    updateVisibility(); refreshPreview();
+  });
+});
+
+$("#sizeMode").addEventListener("change", function(){ updateVisibility(); refreshCost(); refreshPreview(); });
+["pN","pQuality","pSize","pW","pH","pRatio","pResolution","pFormat","pBackground","pModeration","pPartials","pUser","pCompression","taskPath","baseUrl","orgId","projectId","timeoutSec","retryCount","editFormat","asyncPoll"]
+  .forEach(function(id){
+    var el = document.getElementById(id);
+    if (!el) return;
+    el.addEventListener("input", function(){ refreshCost(); refreshPreview(); saveSettings(); });
+    el.addEventListener("change", function(){ updateVisibility(); refreshCost(); refreshPreview(); saveSettings(); });
+  });
+$("#pCompression").addEventListener("input", function(){ $("#compVal").textContent = this.value; });
+$("#prompt").addEventListener("input", function(){
+  $("#promptCount").textContent = this.value.length + " 字";
+});
+document.querySelectorAll("[data-sample]").forEach(function(b){
+  b.addEventListener("click", function(){ $("#prompt").value = SAMPLES[b.dataset.sample]; $("#prompt").dispatchEvent(new Event("input")); });
+});
+$("#btnClearPrompt").addEventListener("click", function(){ $("#prompt").value = ""; $("#prompt").dispatchEvent(new Event("input")); });
+
+$("#refFiles").addEventListener("change", function(){
+  state.refFiles = state.refFiles.concat(Array.prototype.slice.call(this.files));
+  if (state.refFiles.length > 16){ state.refFiles = state.refFiles.slice(0,16); toast("最多 16 张参考图"); }
+  this.value = "";
+  renderFiles();
+});
+$("#maskFile").addEventListener("change", function(){
+  state.maskFile = this.files[0] || null;
+  renderFiles();
+});
+function objectUrl(file){
+  try { return URL.createObjectURL(file); } catch (e) { return ""; }
+}
+function renderFiles(){
+  var box = $("#refList"); box.innerHTML = "";
+  state.refFiles.forEach(function(f, i){
+    var chip = document.createElement("div"); chip.className = "fchip";
+    var img = document.createElement("img"); img.src = objectUrl(f);
+    var nm = document.createElement("span"); nm.textContent = f.name.slice(0, 18);
+    var x = document.createElement("span"); x.className = "x"; x.textContent = "×";
+    x.onclick = function(){ state.refFiles.splice(i,1); renderFiles(); };
+    chip.appendChild(img); chip.appendChild(nm); chip.appendChild(x); box.appendChild(chip);
+  });
+  var mb = $("#maskList"); mb.innerHTML = "";
+  if (state.maskFile){
+    var c2 = document.createElement("div"); c2.className = "fchip";
+    var i2 = document.createElement("img"); i2.src = objectUrl(state.maskFile);
+    var n2 = document.createElement("span"); n2.textContent = "蒙版：" + state.maskFile.name.slice(0,16);
+    var x2 = document.createElement("span"); x2.className = "x"; x2.textContent = "×";
+    x2.onclick = function(){ state.maskFile = null; $("#maskFile").value = ""; renderFiles(); };
+    c2.appendChild(i2); c2.appendChild(n2); c2.appendChild(x2); mb.appendChild(c2);
+  }
+}
+
+$("#btnRun").addEventListener("click", run);
+$("#btnStop").addEventListener("click", function(){
+  if (state.abort) state.abort.abort();
+  logLine("用户请求停止", "w");
+});
+$("#btnDownloadAll").addEventListener("click", function(){
+  var tiles = document.querySelectorAll("#gallery .tile .dl");
+  tiles.forEach(function(a, i){ setTimeout(function(){ a.click(); }, i * 350); });
+  toast("已触发 " + tiles.length + " 个下载");
+});
+$("#btnClearResults").addEventListener("click", function(){
+  $("#gallery").innerHTML = ""; state.results = [];
+  $("#bulkOps").classList.add("hidden"); $("#emptyBox").classList.remove("hidden");
+  $("#mTime").textContent = "—";
+});
+$("#viewerClose").addEventListener("click", function(){ $("#viewer").classList.remove("on"); });
+$("#viewer").addEventListener("click", function(e){ if (e.target === this) this.classList.remove("on"); });
+document.addEventListener("keydown", function(e){ if (e.key === "Escape") $("#viewer").classList.remove("on"); });
+
+/* 配置持久化 */
+function saveSettings(){
+  if (!$("#rememberCfg").checked) return;
+  var s = {};
+  ["baseUrl","apiKey","orgId","projectId","timeoutSec","retryCount","customModel","pQuality","sizeMode","pSize","pW","pH","pRatio","pResolution","pFormat","pBackground","pModeration","pPartials","pUser","taskPath","editFormat"].forEach(function(id){
+    var el = document.getElementById(id); if (el) s[id] = el.value;
+  });
+  s.lockSnapshot = $("#lockSnapshot").checked;
+  s.asyncPoll = $("#asyncPoll").checked;
+  s.model = document.querySelector("input[name=model]:checked").value;
+  try { localStorage.setItem(LS_KEY, JSON.stringify(s)); } catch(e){}
+}
+function loadSettings(){
+  var raw = null;
+  try { raw = localStorage.getItem(LS_KEY); } catch(e){}
+  var s = null;
+  if (raw){ try { s = JSON.parse(raw); } catch(e){} }
+  if (s){
+    Object.keys(s).forEach(function(k){
+      var el = document.getElementById(k);
+      if (el && typeof s[k] === "string") el.value = s[k];
+    });
+    if (s.lockSnapshot) $("#lockSnapshot").checked = true;
+    if (s.asyncPoll) $("#asyncPoll").checked = true;
+    if (s.model){
+      var r = document.querySelector("input[name=model][value=" + s.model + "]");
+      if (r) r.checked = true;
+    }
+    $("#rememberCfg").checked = true;
+  } else {
+    $("#baseUrl").value = "https://api.openai.com";
+    $("#timeoutSec").value = 180;
+    $("#retryCount").value = 1;
+  }
+  $("#cardFlare").classList.toggle("on", document.querySelector("input[name=model]:checked").value === "flare");
+  $("#cardSunburst").classList.toggle("on", document.querySelector("input[name=model]:checked").value === "sunburst");
+  $("#compVal").textContent = $("#pCompression").value;
+}
+$("#rememberCfg").addEventListener("change", function(){
+  if (this.checked) saveSettings();
+  else { try { localStorage.removeItem(LS_KEY); } catch(e){} }
+  toast(this.checked ? "配置已保存到本机" : "已清除本机保存的配置");
+});
+$("#btnReset").addEventListener("click", function(){
+  try { localStorage.removeItem(LS_KEY); } catch(e){}
+  location.reload();
+});
+
+/* 初始化 */
+loadSettings();
+updateVisibility();
+refreshModelIds();
+refreshCost();
+refreshPreview();
+logLine("工具就绪。浏览器直连官方接口需允许 CORS；若被拦截请改用中转 Base URL。");
+setStatus("", "就绪");
+})();
+</script>
+</body>
+</html>
